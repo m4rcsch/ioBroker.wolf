@@ -1,0 +1,410 @@
+<html lang="de">
+<meta charset="UTF-8">
+<!-- these 4 files always have to be included -->
+<link rel="stylesheet" type="text/css" href="../../lib/css/themes/jquery-ui/redmond/jquery-ui.min.css"/>
+
+<script type="text/javascript" src="../../lib/js/jquery-1.11.1.min.js"></script>
+<script type="text/javascript" src="../../lib/js/jquery-ui.min.js"></script>
+<script type="text/javascript" src="../../socket.io/socket.io.js"></script>
+
+
+<!-- these two file always have to be included -->
+<link rel="stylesheet" type="text/css" href="../../css/adapter.css"/>
+<script type="text/javascript" src="../../js/translate.js"></script>
+<script type="text/javascript" src="../../js/adapter-settings.js"></script>
+
+<style>
+    #headText {
+        font-size: 42px;
+        position: relative;
+        /* top: 15px; */
+        left: -60px;
+    }
+
+    #logo {
+        width: 200px;
+        margin-left: 20px;
+        position: relative;
+        left: -100px;
+    }
+
+    .ui-selectmenu-button span.ui-selectmenu-text {
+        padding-left: 5px;
+        padding-top: 0px;
+        padding-right: 0px;
+        padding-bottom: 0px;
+        /*font-size: 1.1em;*/
+    }
+
+    select {
+        width: 120px;
+    }
+
+    image {
+        text-align: center;
+    }
+
+    .number {
+        width: 30px;
+        text-align: right;
+    }
+
+    input {
+        width: 180px;
+        border-radius: 6px;
+        /*font-size: 1.1em;*/
+        padding-top: 3px;
+
+    }
+
+    #hg1_t-button > span.ui-selectmenu-text {
+        font-size: small;
+        padding: 4px;
+    }
+
+    label {
+        height: 24px;
+        width: 117px;
+        padding: 0 !important;
+        margin: 0 !important;
+        display: inline-flex;
+        justify-content: center;
+        align-content: stretch;
+        flex-direction: column;
+        padding-top: 2px !important;
+    }
+
+    label > span {
+        margin: 0;
+        padding: 0 !important;
+        width: 117px;
+
+    }
+
+
+</style>
+
+<!-- you have to define 2 functions in the global scope: -->
+<script type="text/javascript">
+
+    // Dictionary (systemDictionary is global variable from adapter-settings.js)
+    systemDictionary = {};
+
+
+    // the function loadSettings has to exist ...
+    function load(settings, onchange) {
+        getIPs(function (data) {
+
+            $.each(data, function () {
+                if (this.family == "ipv4") {
+                    $("#host_ip").append("<option>" + this.address + "</option>")
+                }
+
+            });
+
+            $("#ism8_ip").val(settings.ism8_ip);
+            $("#ism8_port").val(settings.ism8_port);
+            $("#host_ip").val(settings.host_ip);
+
+
+            $('select').selectmenu({})
+        });
+
+        $('.checkbox').button().click(function () {
+
+            if ($(this).hasClass("bool")) {
+                if ($(this).is(':checked')) {
+                    $(this).siblings('label').html('ON');
+                } else {
+                    $(this).siblings('label').html('off');
+                }
+            } else {
+                if ($(this).is(':checked')) {
+                    $(this).siblings('label').html('Auto');
+                } else {
+                    $(this).siblings('label').html('off');
+                }
+            }
+        });
+
+
+        $('.checkbox').each(function () {
+            if ($(this).hasClass("bool")) {
+                if (settings[$(this).attr("id")] == true) {
+                    $(this).trigger("click")
+                } else {
+                    $(this).siblings('label').html('off');
+                }
+            } else {
+                if (settings.devices[$(this).attr("id").substring(0, 3)] == "Auto") {
+                    $(this).trigger("click")
+                } else {
+                    $(this).siblings('label').html('off');
+                }
+            }
+
+
+        });
+
+
+        $('.names').each(function () {
+            var key = $(this).attr("id");
+
+            $(this).val(settings.names[key]);
+        });
+
+
+//        console.log(adapter.getForeignObjects("*"));
+
+    }
+
+
+    // ... and the function save has to exist.
+    // you have to make sure the callback is called with the settings object as first param!
+    function save(callback) {
+        // example: select elements with class=value and build settings object
+        var obj = {
+            devices: {},
+            names: {},
+            ism8_port: $("#ism8_port").val(),
+            host_ip: $("#host_ip").val(),
+        };
+
+
+        $('.checkbox').each(function () {
+            if ($(this).hasClass("bool")) {
+                if ($(this).is(':checked'))
+                    obj[$(this).attr("id")] = true;
+                else
+                    obj[$(this).attr("id")] = false
+            } else {
+                if ($(this).is(':checked'))
+                    obj.devices[$(this).attr("id").substring(0, 3)] = "Auto";
+                else
+                    obj.devices[$(this).attr("id").substring(0, 3)] = "off"
+            }
+
+        });
+
+        if (obj.devices.hg1 == "Auto") {
+            obj.devices['hg0'] = "Auto"
+        } else {
+            obj.devices['hg0'] = "off"
+        }
+
+        $('.names').each(function () {
+            var key = $(this).attr("id");
+
+            obj.names[key] = $(this).val();
+        });
+
+        callback(obj);
+    }
+
+
+</script>
+
+<!-- you have to put your config page in a div with id adapter-container -->
+<div id="adapter-container"
+     style="height: calc(100% - 95px);width: calc(100% - 7px); overflow: auto; text-align: center; font-family: arial, helvetica; font-size: 1.2em; padding-bottom: 50px"
+     class="ui-widget-content">
+
+    <div style="position: relative; padding: 5px">
+        <image src="wolf_logo.png" id="logo"></image>
+        <span id="headText">Heiztechnik</span>
+    </div>
+    <table style="width: 600px; display: inline-block; text-align: left">
+        <tr>
+            <td colspan="4" style="text-align: center; font-size: 1.4em;" class="ui-widget-header">Verbindung</td>
+        </tr>
+        <tr>
+            <td style="width: 120px">Adapter IP:</td>
+            <td>
+                <select id="host_ip" style="width: 280px">
+                </select>
+            </td>
+            <td style="width: 100px;  text-align: right">Port:</td>
+            <td><input id="ism8_port" type="number" value="12004" style="width: 100px!important"/></td>
+        </tr>
+        <tr>
+            <td>Status als Bool</td>
+            <td>
+                <input type="checkbox" class="checkbox bool" id="bool_status"/><label for="bool_status">ON</label>
+            </td>
+        </tr>
+        <tr>
+            <td>Druck in Bar</td>
+            <td>
+                <input type="checkbox" class="checkbox bool" id="bool_bar"/><label for="bool_bar">ON</label>
+            </td>
+        </tr>
+
+    </table>
+    <br>
+
+    <table style="width: 600px; display: inline-block">
+        <tr>
+            <th style="width: 160px "></th>
+            <th style="width: 50px"></th>
+            <th style="width: 150px"></th>
+            <th style="width: 100px"></th>
+            <th style="width: 230px"></th>
+        </tr>
+        <tr>
+            <td colspan="5" style="text-align: center; font-size: 1.4em;" class="ui-widget-header">Heizgeräte</td>
+        </tr>
+        <tr>
+            <td rowspan="4" style="text-align: center; height: 120px; vertical-align: middle">
+                <image src="image/heating.png" style="height: 100px"></image>
+            </td>
+            <td class="number">(1)</td>
+            <td>
+                <input type="checkbox" class="checkbox" id="hg1_t"/><label for="hg1_t">Auto</label>
+            </td>
+            <td>Name:</td>
+            <td><input class="names" id="hg1_n" type="text"/></td>
+        </tr>
+        <tr>
+            <td class="number">(2)</td>
+            <td>
+                <input type="checkbox" class="checkbox" id="hg2_t"/><label for="hg2_t">Auto</label>
+            </td>
+            <td>Name:</td>
+            <td><input class="names" id="hg2_n" type="text"/></td>
+        </tr>
+        <tr>
+            <td class="number">(3)</td>
+            <td>
+                <input type="checkbox" class="checkbox" id="hg3_t"/><label for="hg3_t">Auto</label>
+            </td>
+            <td>Name:</td>
+            <td><input class="names" id="hg3_n" type="text"/></td>
+        </tr>
+        <tr>
+            <td class="number">(4)</td>
+            <td>
+                <input type="checkbox" class="checkbox" id="hg4_t"/><label for="hg4_t">Auto</label>
+            </td>
+            <td>Name:</td>
+            <td><input class="names" id="hg4_n" type="text"/></td>
+        </tr>
+        <!------------------------------------------------------------------------------------------------>
+        <tr>
+            <td colspan="5" style="text-align: center; font-size: 1.4em" class="ui-widget-header">Bedienmodule</td>
+        </tr>
+        <tr>
+            <td rowspan="4" style="text-align: center; height: 120px; vertical-align: middle">
+                <image src="image/bm2.png" style="height: 100px"></image>
+            </td>
+            <td class="number">(1)</td>
+            <td>
+                <input type="checkbox" class="checkbox" id="bm1_t"/><label for="bm1_t">Auto</label>
+            </td>
+            <td>Name:</td>
+            <td><input class="names" id="bm1_n" type="text"/></td>
+        </tr>
+        <tr>
+            <td class="number">(2)</td>
+            <td>
+                <input type="checkbox" class="checkbox" id="bm2_t"/><label for="bm2_t">Auto</label>
+            </td>
+            <td>Name:</td>
+            <td><input class="names" id="bm2_n" type="text"/></td>
+        </tr>
+        <tr>
+            <td class="number">(3)</td>
+            <td>
+                <input type="checkbox" class="checkbox" id="bm3_t"/><label for="bm3_t">Auto</label>
+            </td>
+            <td>Name:</td>
+            <td><input class="names" id="bm3_n" type="text"/></td>
+        </tr>
+        <tr>
+            <td class="number">(4)</td>
+            <td>
+                <input type="checkbox" class="checkbox" id="bm4_t"/><label for="bm4_t">Auto</label>
+            </td>
+            <td>Name:</td>
+            <td><input class="names" id="bm4_n" type="text"/></td>
+        </tr>
+        <!------------------------------------------------------------------------------------------------>
+        <tr>
+            <td colspan="5" style="text-align: center; font-size: 1.4em" class="ui-widget-header">Mischermodule</td>
+        </tr>
+        <tr>
+            <td rowspan="3" style="text-align: center; height: 120px; vertical-align: middle">
+                <image src="image/uni.png" style="height: 100px"></image>
+            </td>
+            <td class="number">(1)</td>
+            <td>
+                <input type="checkbox" class="checkbox" id="mm1_t"/><label for="mm1_t">Auto</label>
+            </td>
+            <td>Name:</td>
+            <td><input class="names" id="mm1_n" type="text"/></td>
+        </tr>
+        <tr>
+            <td class="number">(2)</td>
+            <td>
+                <input type="checkbox" class="checkbox" id="mm2_t"/><label for="mm2_t">Auto</label>
+            </td>
+            <td>Name:</td>
+            <td><input class="names" id="mm2_n" type="text"/></td>
+        </tr>
+        <tr>
+            <td class="number">(3)</td>
+            <td>
+                <input type="checkbox" class="checkbox" id="mm3_t"/><label for="mm3_t">Auto</label>
+            </td>
+            <td>Name:</td>
+            <td><input class="names" id="mm3_n" type="text"/></td>
+        </tr>
+        <!------------------------------------------------------------------------------------------------>
+        <tr>
+            <td colspan="5" style="text-align: center; font-size: 1.4em" class="ui-widget-header">Kaskadenmodule</td>
+        </tr>
+        <tr>
+            <td rowspan="1" style="text-align: center; height: 120px; vertical-align: middle">
+                <image src="image/uni.png" style="height: 100px"></image>
+            </td>
+            <td class="number">(1)</td>
+            <td>
+                <input type="checkbox" class="checkbox" id="km1_t"/><label for="km1_t">Auto</label>
+            </td>
+            <td>Name:</td>
+            <td><input class="names" id="km1_n" type="text"/></td>
+        </tr>
+        <!------------------------------------------------------------------------------------------------>
+        <tr>
+            <td colspan="5" style="text-align: center; font-size: 1.4em" class="ui-widget-header">Solarmodule</td>
+        </tr>
+        <tr>
+            <td rowspan="1" style="text-align: center; height: 120px; vertical-align: middle">
+                <image src="image/uni.png" style="height: 100px"></image>
+            </td>
+            <td class="number">(1)</td>
+            <td>
+                <input type="checkbox" class="checkbox" id="sm1_t"/><label for="sm1_t">Auto</label>
+            </td>
+            <td>Name:</td>
+            <td><input class="names" id="sm1_n" type="text"/></td>
+        </tr>
+        <!------------------------------------------------------------------------------------------------>
+        <tr>
+            <td colspan="5" style="text-align: center; font-size: 1.4em" class="ui-widget-header">
+                Comfort-Wohnungs-Lüftung
+            </td>
+        </tr>
+        <tr>
+            <td rowspan="1" style="text-align: center; height: 120px; vertical-align: middle">
+                <image src="image/cwl.png" style="height: 100px"></image>
+            </td>
+            <td class="number">(1)</td>
+            <td>
+                <input type="checkbox" class="checkbox" id="cwl_t"/><label for="cwl_t">Auto</label>
+            </td>
+            <td>Name:</td>
+            <td><input class="names" id="cwl_n" type="text"/></td>
+        </tr>
+    </table>
+</div>
+</html>
