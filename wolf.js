@@ -174,7 +174,7 @@ function decode(type, data, dp) {
             } else {
                 throw "";
             }
-        } else if (datapoints[dp].name == "Programm CWL") {
+        } else if (datapoints[dp].name == "Programmwahl CWL") {
             if (_data == 0) {
                 return "Automatikbetrieb"
             } else if (_data == 1) {
