@@ -1,21 +1,21 @@
-﻿//﻿'use strict';
-
+//﻿'use strict';
+ 
 var net = require('net');
 var utils = require(__dirname + '/lib/utils');
 var adapter = utils.adapter('wolf');
-
-
+ 
+ 
 var dec = new (require('./js/decoder.js'))();
 var enc = new (require('./js/encoder.js'))();
 var datapoints = require('./js/datapoints.json');
-
+ 
 var names = ""
 var ack_data = {
     old_devices: {},
     new_devices: []
 };
 var ignore = {};
-
+ 
 function getDevice(dp) {
     if (dp >= 1 && dp <= 13) {
         return 'hg1'
@@ -51,7 +51,7 @@ function getDevice(dp) {
         return null;
     }
 }
-
+ 
 function getDeviceRage(id) {
     if (id == 'hg1') {
         return {'lsb': 1, 'msb': 13}
@@ -86,13 +86,13 @@ function getDeviceRage(id) {
     } else {
         return false
     }
-
+ 
 }
-
+ 
 function decode(type, data, dp) {
     var val;
     var _data;
-
+ 
     if (type == 'DPT_Switch') {
         val = data.readInt8(0);
         if (val == 0) {
@@ -101,7 +101,7 @@ function decode(type, data, dp) {
             }else{
                 return 'Off'
             }
-
+ 
         } else {
             if(adapter.config.bool_status){
                 return true
@@ -110,7 +110,7 @@ function decode(type, data, dp) {
             }
         }
     } else if (type == 'DPT_Bool') {
-
+ 
         val = data.readInt8(0);
         if (val == 0) {
             return 'false'
@@ -148,20 +148,29 @@ function decode(type, data, dp) {
             }
         }
     } else if (type == 'DPT_Scaling') {
-        return Math.round(parseInt(dec.decodeDPT5(data)) * 0.4)
+		
+		 if (datapoints[dp].name == "Lüftungsstufe") {
+					  return Math.round(parseInt(dec.decodeDPT5(data)) /2.55 )  // 225 m3/h = 100% --> 2,87  bei 200 m3/h = 100% --> 2,55 
+		} else {
+                  return Math.round(parseInt(dec.decodeDPT5(data)) * 100/255)
+            }
+      
     } else if (type == 'DPT_Value_Temp' || type == 'DPT_Tempd' || type == 'DPT_Value_Pres' || type == 'DPT_Power' || type == 'DPT_Value_Volume_Flow') {
         if(adapter.config.bool_bar && type == 'DPT_Value_Pres' ){
             return Math.round((dec.decodeDPT9(data) / 100000) * 100) / 100
         }else {
             return Math.round(dec.decodeDPT9(data) * 100) / 100
         }
-
+ 
     } else if (type == 'DPT_TimeOfDay') {
         return dec.decodeDPT10(data)
     } else if (type == 'DPT_Date') {
         return dec.decodeDPT11(data)
-    } else if (type == 'DPT_FlowRate_m3/h') {
-        return dec.decodeDPT13(data)
+    } else if (type == 'DPT_FlowRate_m3/h') {		
+       
+		
+		return Math.round(dec.decodeDPT13(data) / 10000) // Berechnung m3/h
+		
     } else if (type == 'DPT_DHWMode') {
         _data = data.readInt8(0);
         if (datapoints[dp].name == "Programmwahl Warmwasser") {
@@ -174,24 +183,27 @@ function decode(type, data, dp) {
             } else {
                 throw "";
             }
-        } else if (datapoints[dp].name == "Programmwahl CWL") {
+        } else if (datapoints[dp].name == "Programm CWL") {
             if (_data == 0) {
                 return "Automatikbetrieb"
             } else if (_data == 1) {
                 return "Nennlüftung"
             } else if (_data == 3) {
-                return "Reduzierte Lüftung"
+                return "Reduzierte Lüftung"				
+            } else if (_data == 2) {
+                return "Lüftung Aus"
             } else {
-                throw "";
+               throw " "+data+ " ";
+			  // throw "";
             }
         } else {
             throw "";
         }
-
+ 
     }
     else if (type == 'DPT_HVACMode') {
         _data = data.readInt8(0);
-
+ 
         if (datapoints[dp].name == "Programmwahl Heizkreis" || datapoints[dp].name == "Programmwahl Mischer") {
             if (_data == 2) {
                 return "Standby"
@@ -246,7 +258,7 @@ function decode(type, data, dp) {
         throw "";
     }
 }
-
+ 
 function encode(data, dp) {
     var val;
     var _data;
@@ -259,9 +271,9 @@ function encode(data, dp) {
     //"DPT_Tempd",
     //"DPT_TimeOfDay"
     //"DPT_Date"
-
+ 
     if (type == 'DPT_Switch') {
-
+ 
         if (['On', 'on', 'Enable', '1', 'true', 1, true].indexOf(data) > -1) {
             return [new Buffer("01", "hex"), "On"];
         } else {
@@ -285,7 +297,7 @@ function encode(data, dp) {
             val = 0
         }
         return [enc.encodeDPT9(data), val]
-
+ 
     } else if (name == "Programmwahl Warmwasser") {
         if (data == 0 || data == "Standby") {
             return [new Buffer("04", "hex"), "Standby"];
@@ -295,6 +307,20 @@ function encode(data, dp) {
         } else {
             return [new Buffer("00", "hex"), "Automatikbetrieb"];
         }
+    } else if (name == "Programm CWL") {
+        if (data == 3 || data == "Reduzierte Lüftung") {
+            return [new Buffer("03", "hex"), "Reduzierte Lüftung"];
+        }
+        else if (data == 2 || data == "Lüftung Aus") {
+            return [new Buffer("02", "hex"), "Lüftung Aus"];
+        } else if (data == 1 || data == "Nennlüftung") {
+            return [new Buffer("01", "hex"), "Nennlüftung"];
+        }
+		else {
+            return [new Buffer("00", "hex"), "Automatikbetrieb"];
+        }
+		   
+		
     } else if (name == "Programmwahl Mischer" || name == "Programmwahl Heizkreis") {
         if (data == 0 || data == "Standby") {
             return [new Buffer("02", "hex"), "Standby"];
@@ -320,32 +346,32 @@ function encode(data, dp) {
     else {
         return "error"
     }
-
+ 
 }
-
+ 
 function bufferIndexOf(buf, search, offset) {
     offset = offset || 0;
-
+ 
     var m = 0;
     var s = -1;
     for (var i = offset; i < buf.length; ++i) {
-
+ 
         if (buf[i] != search[m]) {
             s = -1;
             m = 0;
         }
-
+ 
         if (buf[i] == search[m]) {
             if (s == -1) s = i;
             ++m;
             if (m == search.length) break;
         }
     }
-
+ 
     if (s > -1 && buf.length - s < search.length) return -1;
     return s;
 }
-
+ 
 function addGroup(dev) {
     var group_name = '';
     if (adapter.config.names[dev + "_n"] == "") {
@@ -365,7 +391,7 @@ function addGroup(dev) {
     } else {
         group_name = adapter.config.names[dev + "_n"];
     }
-
+ 
     adapter.setObject(dev, {
         type: 'channel',
         common: {
@@ -375,19 +401,19 @@ function addGroup(dev) {
         native: {}
     });
 }
-
+ 
 function addDevice(dp, callback) {
     var dev = getDevice(dp)
     if (dev) {
         //ack_data.new_devices.push(dev);
         var range = getDeviceRage(dev);
-
-
+ 
+ 
         addGroup(dev)
-
-
+ 
+ 
         for (range.lsb; range.lsb <= range.msb; range.lsb++) {
-
+ 
             if (!ack_data[range.lsb]) {
                 var data = datapoints[range.lsb];
                 if(data.einheit == "Pa" && adapter.config.bool_bar == true){
@@ -412,22 +438,22 @@ function addDevice(dp, callback) {
         }
         callback()
     }
-
+ 
 }
-
+ 
 function main() {
-
+ 
     adapter.getForeignObjects(adapter.namespace + '.*', function (err, list) {
-
+ 
         for (var idd in list) {
-
+ 
             ack_data[idd.split('.').pop()] = {id: idd};
             ack_data.old_devices[idd.split('.')[2]] = idd.split('.')[2];
         }
-
+ 
         var devices = adapter.config.devices;
         names = adapter.config.names;
-
+ 
         for (var dev in devices) {
             if (ack_data.old_devices[dev]) {
                 if (devices[dev] == "off") {
@@ -438,26 +464,26 @@ function main() {
                 }
             }
         }
-
+ 
         adapter.subscribeStates('*');
-
+ 
         server();
     });
 }
-
+ 
 function server() {
     var buff_req = new Buffer("0620F080001104000000F086006E000000", "hex");
     var buff_getall = new Buffer("0620F080001604000000F0D0", "hex");
     var splitter = new Buffer("0620f080", "hex");
-
+ 
     net.createServer(function (sock) {
-
+ 
         //var buff_set = new Buffer("0620F080001404000000F0C10039000100390001", "hex");
         //0620F080001504000000F006006E0001006E030101
         adapter.on('stateChange', function (id, state) {
             if (state && !state.ack && id) {
                 var dp = parseInt(id.split('.').pop());
-                if (datapoints[dp].rw == "r") {
+                if (datapoints[dp].rw == "r" ) {
                     adapter.setState(id, ack_data[dp].value, true);
                     adapter.log.error("oid: " + id + " is only readable")
                 } else {
@@ -466,17 +492,17 @@ function server() {
                     if (bufVal != 'error') {
                         var _buff_set = Buffer.concat([new Buffer("0620F08000" + (20 + bufVal.length).toString(16) + "04000000F0C100" + dp.toString(16) + "000100" + dp.toString(16) + "000" + bufVal.length.toString(16) + "", "hex"), bufVal], bufVal.length + 20)
                         adapter.setState(id, enc[1], true); // todo hier an ism8 senden
-
+ 
                         sock.write(_buff_set)
                     } else {
                         adapter.log.error("Can't encode DP : " + dp + " - data: " + enc[1] + " - type: " + datapoints[dp].type);
                     }
-
+ 
                 }
             }
         });
-
-
+ 
+ 
         var val;
         var dp;
         var device;
@@ -487,24 +513,24 @@ function server() {
             //console.log(_data)
             search = -1;
             lines = [];
-
-
+ 
+ 
             while ((search = bufferIndexOf(_data, splitter)) > -1) {
                 lines.push(_data.slice(0, search + splitter.length));
                 _data = _data.slice(search + splitter.length, _data.length);
             }
-
+ 
             if (_data.length) lines.push(_data);
-
+ 
             for (var i = 1; i < lines.length; i++) {
-
+ 
                 data = Buffer.concat([splitter, lines[i]]);
-
+ 
                 buff_req[12] = data[12];
                 buff_req[13] = data[13];
                 sock.write(buff_req);
-
-
+ 
+ 
                 dp = data.readUInt16BE(12);
                 device = getDevice(dp);
                 if (adapter.config.devices[device] == "Auto")
@@ -518,26 +544,31 @@ function server() {
                                 ignore[device] = undefined;
                             }
                         }
-
+ 
                         if (!ignore[device]) {
                             addDevice(dp, function () {
                                 setState()
                             })
                         }
                     }
-
-
+ 
+ 
                 function setState() {
                     try {
                         val = decode(datapoints[dp].type, data.slice(20), dp);
-
+ 
                         adapter.setState(device + '.' + dp, val, true);
-                        ack_data[dp]["value"] = val;
-
+                        ack_data[dp]["value"] = val;	
+					//Adpater querstriche hin  Anzeige aller Werte als Error
+				//	adapter.log.error("Can parse DP X : " + device +" Y "+ dp  + " -" + val );						
+                        
                     }
                     catch (err) {
-                        val = "";
-                        adapter.log.error("Can't parse DP : " + dp + " - data: " + data.toString("hex") + " - length: " + data.length);
+			// bei val die Querstriche weg
+                     //   val = "";
+					 // bei Adpter Log  die oberequerstriche hin unten querstriche weg
+                        adapter.log.error("Can't parse DP X : " + dp + " - data: " + data.toString("hex") + " - " + val + " length: " + data.length);
+                     //  adapter.log.error("Can't parse DP: " + dp + " " + datapoints[dp].name  + "- data: " + data.toString("hex") + " -" + val + " length: " + data.length);
                         adapter.log.debug('incomming' +
                             '\n Device: ' + device +
                             '\n Datapoint: ' + dp +
@@ -552,16 +583,16 @@ function server() {
                 }
             }
         })
-
+ 
         sock.write(buff_getall);
     }).listen(adapter.config.ism8_port, adapter.config.host_ip);
 }
-
+ 
 adapter.on('ready', function () {
     main();
 });
-
-
+ 
+ 
 //function test(_data) {
 //    var _data = new Buffer("0620f080001504000000f00600020001000203010b", "hex");
 //    var val;
@@ -587,6 +618,6 @@ adapter.on('ready', function () {
 //    console.log('oid: ' + device + '.' + dp);
 //}
 //test()
-
+ 
 //todo DPT_HVACContrMode 0620f080001504000000f00600020001000203010b
 //todo DPT_HVACContrMode 0620f080001504000000f006000200010002030101

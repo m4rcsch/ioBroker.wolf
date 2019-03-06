@@ -888,7 +888,7 @@
     "einheit": ""
   },
  "149": {
-    "name": "Programmwahl CWL",
+    "name": "Programm CWL",
     "type": "DPT_DHWMode",
     "rw": "rw",
     "einheit": ""
@@ -919,13 +919,13 @@
   },
  "154": {
     "name": "Zeitweise Intensivlüftung Startdatum",
-    "type": "DPT_Date",
+    "type": "DPT_Switch",
     "rw": "rw",
     "einheit": ""
   },
  "155": {
     "name": "Zeitweise Intensivlüftung Enddatum",
-    "type": "DPT_Date",
+    "type": "DPT_Switch",
     "rw": "rw",
     "einheit": ""
   },
@@ -949,25 +949,25 @@
   },
  "159": {
     "name": "Zeitweiser Feuchteschutz Startdatum",
-    "type": "DPT_Date",
+    "type": "DPT_Switch",
     "rw": "rw",
     "einheit": ""
   },
  "160": {
     "name": "Zeitweiser Feuchteschutz Enddatum",
-    "type": "DPT_Date",
+    "type": "DPT_Switch",
     "rw": "rw",
     "einheit": ""
   },
  "161": {
     "name": "Zeitweiser Feuchteschutz Startzeit",
-    "type": "DPT_TimeOfDay",
+    "type": "DPT_Switch",
     "rw": "rw",
     "einheit": ""
   },
  "162": {
     "name": "Zeitweiser Feuchteschutz Endzeit",
-    "type": "DPT_TimeOfDay",
+    "type": "DPT_Switch",
     "rw": "rw",
     "einheit": ""
   },
