@@ -931,13 +931,13 @@
   },
  "156": {
     "name": "Zeitweise Intensivlüftung Startzeit",
-    "type": "DPT_TimeOfDay",
+    "type": "DPT_Switch",
     "rw": "rw",
     "einheit": ""
   },
  "157": {
     "name": "Zeitweise Intensivlüftung Endzeit",
-    "type": "DPT_TimeOfDay",
+    "type": "DPT_Switch",
     "rw": "rw",
     "einheit": ""
   },
